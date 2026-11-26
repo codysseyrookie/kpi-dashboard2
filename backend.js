@@ -25,7 +25,17 @@
     async function signIn(email, password) {
       if (!client) throw new Error('Supabase에 먼저 연결하세요.');
       const { data, error } = await client.auth.signInWithPassword({ email, password });
-      if (error) throw new Error('로그인 실패: 이메일·비밀번호와 앱 사용자 계정 상태를 확인하세요.');
+      if (error) {
+        const code = error.code || error.error_code || '';
+        if (code === 'invalid_credentials' || /invalid login credentials/i.test(error.message || '')) {
+          throw new Error('로그인 실패: 이메일 또는 비밀번호가 일치하지 않습니다. Supabase Authentication > Users의 계정과 입력값을 확인하세요.');
+        }
+        if (code === 'email_not_confirmed' || /email not confirmed/i.test(error.message || '')) {
+          throw new Error('로그인 실패: 이메일 확인이 완료되지 않은 계정입니다. Supabase Authentication > Users에서 사용자를 확인 처리하세요.');
+        }
+        const detail = [code, error.status].filter(Boolean).join(', ');
+        throw new Error(`로그인 실패${detail ? ` (${detail})` : ''}: ${error.message || 'Supabase Auth 설정과 앱 사용자 상태를 확인하세요.'}`);
+      }
       return data.session;
     }
     async function signOut() {
